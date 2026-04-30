@@ -6,7 +6,7 @@
 // =============================================
 
 // --- OTA ---
-#define OTA_CHECK_INTERVAL_MS 60 * 1000  // How often to check for updates (ms). 60 * 1000 = 1 min
+#define OTA_CHECK_INTERVAL_MS 60 * 60 * 1000  // How often to check for updates (ms). 60 * 60 * 1000 = 1 hour
 
 // --- LED Strip ---
 #define LED_PIN        8       // GPIO pin connected to DATA line
