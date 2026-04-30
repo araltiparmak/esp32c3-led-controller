@@ -353,7 +353,13 @@ const char* html =
   "<button class='btn' style='background:#444' onclick=\"set('breathing')\">Breathing</button>"
   "<button class='btn' style='background:#444' onclick=\"set('chase')\">Chase</button>"
   "<button class='btn' style='background:#444' onclick=\"set('twinkle')\">Twinkle</button>"
-  "<script>function set(t){fetch('/theme?name='+t)}</script>"
+  "<hr style='border-color:#333;margin:20px 0'>"
+  "<button class='btn' style='background:#2ecc71' onclick='checkUpdate()'>Check for Update</button>"
+  "<p id='msg' style='color:#aaa;font-size:0.9em'></p>"
+  "<script>"
+  "function set(t){fetch('/theme?name='+t)}"
+  "function checkUpdate(){document.getElementById('msg').innerText='Checking...';fetch('/update').then(r=>r.text()).then(t=>{document.getElementById('msg').innerText=t})}"
+  "</script>"
   "</body></html>";
 
 void web_setup() {
@@ -371,6 +377,11 @@ void web_setup() {
     else if (name == "green")     current_theme = GREEN;
     else if (name == "blue")      current_theme = BLUE;
     server.send(200, "text/plain", "ok");
+  });
+
+  server.on("/update", []() {
+    server.send(200, "text/plain", "Checking for update...");
+    ota_check();
   });
 
   server.begin();
