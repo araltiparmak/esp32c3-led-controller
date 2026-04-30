@@ -15,10 +15,26 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Cache arduino-cli
+        uses: actions/cache@v4
+        with:
+          path: ~/bin/arduino-cli
+          key: arduino-cli-latest
+
       - name: Install arduino-cli
         run: |
-          curl -fsSL https://raw.githubusercontent.com/arduino/arduino-cli/master/install.sh | sh
-          echo "$PWD/bin" >> $GITHUB_PATH
+          if [ ! -f ~/bin/arduino-cli ]; then
+            curl -fsSL https://raw.githubusercontent.com/arduino/arduino-cli/master/install.sh | BINDIR=~/bin sh
+          fi
+          echo "$HOME/bin" >> $GITHUB_PATH
+
+      - name: Cache ESP32 core and libraries
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.arduino15
+            ~/Arduino/libraries
+          key: arduino-deps-${{ hashFiles('.github/workflows/release.yml') }}
 
       - name: Add ESP32 board support
         run: |
