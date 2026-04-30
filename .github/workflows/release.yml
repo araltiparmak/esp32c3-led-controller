@@ -1,0 +1,55 @@
+name: Build and Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install arduino-cli
+        run: |
+          curl -fsSL https://raw.githubusercontent.com/arduino/arduino-cli/master/install.sh | sh
+          echo "$PWD/bin" >> $GITHUB_PATH
+
+      - name: Add ESP32 board support
+        run: |
+          arduino-cli config init
+          arduino-cli config add board_manager.additional_urls https://raw.githubusercontent.com/espressif/arduino-esp32/gh-pages/package_esp32_index.json
+          arduino-cli core update-index
+          arduino-cli core install esp32:esp32
+
+      - name: Install FastLED
+        run: arduino-cli lib install "FastLED"
+
+      - name: Create config.h from example
+        run: cp firmware/config.example.h firmware/config.h
+
+      - name: Build firmware
+        run: |
+          VERSION="${{ github.ref_name }}"
+          VERSION="${VERSION#v}"
+          arduino-cli compile \
+            --fqbn esp32:esp32:esp32c3:CDCOnBoot=cdc \
+            --build-property "compiler.cpp.extra_flags=-DFIRMWARE_VERSION='\"${VERSION}\"'" \
+            --output-dir build/ \
+            firmware/
+
+      - name: Rename .bin file
+        run: |
+          VERSION="${{ github.ref_name }}"
+          mv build/firmware.ino.bin build/firmware-${VERSION}.bin
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: build/firmware-${{ github.ref_name }}.bin
+          generate_release_notes: true
