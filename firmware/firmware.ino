@@ -231,7 +231,9 @@ void ota_check() {
   http.end();
 
   String tag = extract_json_string(payload, "tag_name");
+  Serial.printf("Latest tag: '%s', Current: '%s'\n", tag.c_str(), FIRMWARE_VERSION);
   if (tag.startsWith("v")) tag = tag.substring(1);
+  Serial.printf("Comparing: '%s' == '%s' ? %d\n", tag.c_str(), FIRMWARE_VERSION, tag == FIRMWARE_VERSION);
 
   if (tag.isEmpty() || tag == FIRMWARE_VERSION) {
     Serial.println("Already up to date");
