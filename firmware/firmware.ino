@@ -37,6 +37,36 @@ void led_rainbow(uint8_t speed) {
   rainbow_hue += speed;
 }
 
+void led_breathing(CRGB color) {
+  static uint8_t brightness = 0;
+  static int8_t direction = 1;
+  FastLED.setBrightness(brightness);
+  fill_solid(leds, NUM_LEDS, color);
+  FastLED.show();
+  brightness += direction * 2;
+  if (brightness >= 200 || brightness <= 2) direction = -direction;
+  delay(10);
+}
+
+void led_chase(CRGB color) {
+  static uint8_t pos = 0;
+  fill_solid(leds, NUM_LEDS, CRGB::Black);
+  for (int i = 0; i < 5; i++) {
+    leds[(pos + i) % NUM_LEDS] = color;
+  }
+  FastLED.show();
+  pos = (pos + 1) % NUM_LEDS;
+  delay(30);
+}
+
+void led_twinkle() {
+  fadeToBlackBy(leds, NUM_LEDS, 20);
+  int pos = random16(NUM_LEDS);
+  leds[pos] += CHSV(random8(), 200, 255);
+  FastLED.show();
+  delay(20);
+}
+
 // =============================================
 //   WiFi + WPS
 // =============================================
@@ -313,6 +343,9 @@ void ota_task(void* arg) {
 }
 
 void loop() {
-  led_rainbow(2);
-  delay(20);
+  // Themes - uncomment one:
+  // led_rainbow(2);
+  // led_breathing(CRGB::Blue);
+  // led_chase(CRGB::Red);
+  led_twinkle();
 }
