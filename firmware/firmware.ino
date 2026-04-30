@@ -1,5 +1,6 @@
 #include <FastLED.h>
 #include <WiFi.h>
+#include <WebServer.h>
 #include <HTTPClient.h>
 #include <WiFiClientSecure.h>
 #include <Update.h>
@@ -20,6 +21,9 @@
 
 CRGB leds[NUM_LEDS];
 uint8_t rainbow_hue = 0;
+
+enum Theme { RAINBOW, BREATHING, CHASE, TWINKLE, RED, GREEN, BLUE };
+volatile Theme current_theme = RAINBOW;
 
 void led_clear() {
   fill_solid(leds, NUM_LEDS, CRGB::Black);
@@ -319,6 +323,60 @@ void ota_check() {
 }
 
 // =============================================
+//   Web Server
+// =============================================
+
+WebServer server(80);
+
+const char* html =
+  "<!DOCTYPE html><html><head>"
+  "<meta charset='utf-8'>"
+  "<meta name='viewport' content='width=device-width,initial-scale=1'>"
+  "<title>LED Controller</title>"
+  "<style>"
+  "body{font-family:sans-serif;background:#111;color:#fff;text-align:center;padding:20px}"
+  "h1{font-size:1.4em;margin-bottom:30px}"
+  ".btn{display:block;width:80%;margin:12px auto;padding:18px;font-size:1.2em;font-weight:bold;border:none;border-radius:14px;cursor:pointer;color:#fff}"
+  "</style></head><body>"
+  "<h1>LED Controller</h1>"
+  "<button class='btn' style='background:#cc0000' onclick=\"set('red')\">Red</button>"
+  "<button class='btn' style='background:#00aa00' onclick=\"set('green')\">Green</button>"
+  "<button class='btn' style='background:#0055cc' onclick=\"set('blue')\">Blue</button>"
+  "<hr style='border-color:#333;margin:20px 0'>"
+  "<button class='btn' style='background:#444' onclick=\"set('rainbow')\">Rainbow</button>"
+  "<button class='btn' style='background:#444' onclick=\"set('breathing')\">Breathing</button>"
+  "<button class='btn' style='background:#444' onclick=\"set('chase')\">Chase</button>"
+  "<button class='btn' style='background:#444' onclick=\"set('twinkle')\">Twinkle</button>"
+  "<script>function set(t){fetch('/theme?name='+t)}</script>"
+  "</body></html>";
+
+void web_task(void* arg) {
+  server.on("/", []() {
+    server.send(200, "text/html", html);
+  });
+
+  server.on("/theme", []() {
+    String name = server.arg("name");
+    if      (name == "rainbow")   current_theme = RAINBOW;
+    else if (name == "breathing") current_theme = BREATHING;
+    else if (name == "chase")     current_theme = CHASE;
+    else if (name == "twinkle")   current_theme = TWINKLE;
+    else if (name == "red")       current_theme = RED;
+    else if (name == "green")     current_theme = GREEN;
+    else if (name == "blue")      current_theme = BLUE;
+    server.send(200, "text/plain", "ok");
+  });
+
+  server.begin();
+  Serial.printf("Web UI: http://%s\n", WiFi.localIP().toString().c_str());
+
+  while (true) {
+    server.handleClient();
+    vTaskDelay(pdMS_TO_TICKS(5));
+  }
+}
+
+// =============================================
 //   Main
 // =============================================
 
@@ -332,12 +390,13 @@ void setup() {
   wifi_connect();
 
   xTaskCreate(ota_task, "ota", 8192, NULL, 1, NULL);
+  xTaskCreate(web_task, "web", 8192, NULL, 1, NULL);
 
   Serial.printf("Ready! Firmware v%s\n", FIRMWARE_VERSION);
 }
 
 void ota_task(void* arg) {
-  vTaskDelay(pdMS_TO_TICKS(5000));  // wait 5s after boot before first check
+  vTaskDelay(pdMS_TO_TICKS(5000));
   while (true) {
     ota_check();
     vTaskDelay(pdMS_TO_TICKS(OTA_CHECK_INTERVAL_MS));
@@ -345,9 +404,25 @@ void ota_task(void* arg) {
 }
 
 void loop() {
-  // Themes - uncomment one:
-  // led_rainbow(2);
-  // led_breathing(CRGB::Blue);
-  // led_chase(CRGB::Red);
-  led_twinkle();
+  static unsigned long last_status = 0;
+  if (millis() - last_status > 10000) {
+    last_status = millis();
+    Serial.printf("IP: %s | Theme: %d | v%s\n", WiFi.localIP().toString().c_str(), current_theme, FIRMWARE_VERSION);
+  }
+
+  static Theme last_theme = current_theme;
+  if (current_theme != last_theme) {
+    FastLED.setBrightness(LED_BRIGHTNESS);
+    last_theme = current_theme;
+  }
+
+  switch (current_theme) {
+    case RAINBOW:   led_rainbow(2);            break;
+    case BREATHING: led_breathing(CRGB::Blue); break;
+    case CHASE:     led_chase(CRGB::White);    break;
+    case TWINKLE:   led_twinkle();             break;
+    case RED:       led_set_color(255, 0, 0);  delay(20); break;
+    case GREEN:     led_set_color(0, 255, 0);  delay(20); break;
+    case BLUE:      led_set_color(0, 0, 255);  delay(20); break;
+  }
 }
