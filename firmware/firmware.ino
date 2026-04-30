@@ -7,8 +7,11 @@
 #include <esp_wps.h>
 #include "config.h"
 
+#if __has_include("version.h")
+  #include "version.h"
+#endif
 #ifndef FIRMWARE_VERSION
-#define FIRMWARE_VERSION "dev"
+  #define FIRMWARE_VERSION "dev"
 #endif
 
 // =============================================
@@ -46,13 +49,19 @@ static String wps_pass = "";
 void wps_event_handler(WiFiEvent_t event, WiFiEventInfo_t info) {
   switch (event) {
     case ARDUINO_EVENT_WPS_ER_SUCCESS:
+      Serial.println("WPS event: SUCCESS");
       wps_success = true;
       break;
     case ARDUINO_EVENT_WPS_ER_FAILED:
+      Serial.println("WPS event: FAILED");
+      wps_failed = true;
+      break;
     case ARDUINO_EVENT_WPS_ER_TIMEOUT:
+      Serial.println("WPS event: TIMEOUT");
       wps_failed = true;
       break;
     default:
+      Serial.printf("WPS event: %d\n", event);
       break;
   }
 }
@@ -62,21 +71,31 @@ void wifi_wps() {
 
   WiFi.onEvent(wps_event_handler);
   WiFi.mode(WIFI_STA);
+  WiFi.disconnect();
+  delay(100);
 
   esp_wps_config_t wps_config;
   memset(&wps_config, 0, sizeof(wps_config));
   wps_config.wps_type = WPS_TYPE_PBC;
 
-  esp_wifi_wps_enable(&wps_config);
-  esp_wifi_wps_start(0);
+  esp_err_t err = esp_wifi_wps_enable(&wps_config);
+  Serial.printf("esp_wifi_wps_enable: %s\n", esp_err_to_name(err));
+
+  err = esp_wifi_wps_start(0);
+  Serial.printf("esp_wifi_wps_start: %s\n", esp_err_to_name(err));
 
   // Purple blink while waiting for WPS button press
   bool blink = false;
   unsigned long start = millis();
+  unsigned long last_print = 0;
   while (!wps_success && !wps_failed && millis() - start < 120000) {
     led_set_color(blink ? 150 : 0, 0, blink ? 150 : 0);
     blink = !blink;
     delay(500);
+    if (millis() - last_print > 5000) {
+      Serial.printf("Waiting for WPS... (%ds elapsed)\n", (millis() - start) / 1000);
+      last_print = millis();
+    }
   }
 
   esp_wifi_wps_disable();

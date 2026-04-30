@@ -6,6 +6,9 @@ __pycache__/
 # User config - contains WiFi credentials, never commit this
 firmware/config.h
 
+# Auto-generated version file
+firmware/version.h
+
 # Build artifacts
 build/
 firmware/build/

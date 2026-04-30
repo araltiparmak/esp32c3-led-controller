@@ -33,13 +33,16 @@ jobs:
       - name: Create config.h from example
         run: cp firmware/config.example.h firmware/config.h
 
-      - name: Build firmware
+      - name: Set version
         run: |
           VERSION="${{ github.ref_name }}"
           VERSION="${VERSION#v}"
+          printf '#define FIRMWARE_VERSION "%s"\n' "${VERSION}" > firmware/version.h
+
+      - name: Build firmware
+        run: |
           arduino-cli compile \
             --fqbn esp32:esp32:esp32c3:CDCOnBoot=cdc \
-            --build-property "compiler.cpp.extra_flags=-DFIRMWARE_VERSION='\"${VERSION}\"'" \
             --output-dir build/ \
             firmware/
 
