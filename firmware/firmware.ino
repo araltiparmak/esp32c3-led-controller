@@ -35,40 +35,46 @@ void led_set_color(uint8_t r, uint8_t g, uint8_t b) {
   FastLED.show();
 }
 
-void led_rainbow(uint8_t speed) {
-  fill_rainbow(leds, NUM_LEDS, rainbow_hue, 7);
-  FastLED.show();
-  rainbow_hue += speed;
-}
-
 void led_breathing(CRGB color) {
   static uint8_t brightness = 0;
   static int8_t direction = 1;
+  static unsigned long last = 0;
+  if (millis() - last < 10) return;
+  last = millis();
   FastLED.setBrightness(brightness);
   fill_solid(leds, NUM_LEDS, color);
   FastLED.show();
   brightness += direction * 2;
   if (brightness >= 200 || brightness <= 2) direction = -direction;
-  delay(10);
 }
 
 void led_chase(CRGB color) {
   static uint8_t pos = 0;
+  static unsigned long last = 0;
+  if (millis() - last < 30) return;
+  last = millis();
   fill_solid(leds, NUM_LEDS, CRGB::Black);
-  for (int i = 0; i < 5; i++) {
-    leds[(pos + i) % NUM_LEDS] = color;
-  }
+  for (int i = 0; i < 5; i++) leds[(pos + i) % NUM_LEDS] = color;
   FastLED.show();
   pos = (pos + 1) % NUM_LEDS;
-  delay(30);
 }
 
 void led_twinkle() {
+  static unsigned long last = 0;
+  if (millis() - last < 20) return;
+  last = millis();
   fadeToBlackBy(leds, NUM_LEDS, 20);
-  int pos = random16(NUM_LEDS);
-  leds[pos] += CHSV(random8(), 200, 255);
+  leds[random16(NUM_LEDS)] += CHSV(random8(), 200, 255);
   FastLED.show();
-  delay(20);
+}
+
+void led_rainbow(uint8_t speed) {
+  static unsigned long last = 0;
+  if (millis() - last < 20) return;
+  last = millis();
+  fill_rainbow(leds, NUM_LEDS, rainbow_hue, 7);
+  FastLED.show();
+  rainbow_hue += speed;
 }
 
 // =============================================
@@ -350,7 +356,7 @@ const char* html =
   "<script>function set(t){fetch('/theme?name='+t)}</script>"
   "</body></html>";
 
-void web_task(void* arg) {
+void web_setup() {
   server.on("/", []() {
     server.send(200, "text/html", html);
   });
@@ -369,11 +375,6 @@ void web_task(void* arg) {
 
   server.begin();
   Serial.printf("Web UI: http://%s\n", WiFi.localIP().toString().c_str());
-
-  while (true) {
-    server.handleClient();
-    vTaskDelay(pdMS_TO_TICKS(5));
-  }
 }
 
 // =============================================
@@ -388,9 +389,9 @@ void setup() {
   led_clear();
 
   wifi_connect();
+  web_setup();
 
   xTaskCreate(ota_task, "ota", 8192, NULL, 1, NULL);
-  xTaskCreate(web_task, "web", 8192, NULL, 1, NULL);
 
   Serial.printf("Ready! Firmware v%s\n", FIRMWARE_VERSION);
 }
@@ -409,6 +410,8 @@ void loop() {
     last_status = millis();
     Serial.printf("IP: %s | Theme: %d | v%s\n", WiFi.localIP().toString().c_str(), current_theme, FIRMWARE_VERSION);
   }
+
+  server.handleClient();
 
   static Theme last_theme = current_theme;
   if (current_theme != last_theme) {
