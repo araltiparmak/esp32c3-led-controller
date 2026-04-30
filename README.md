@@ -41,7 +41,7 @@ Download from [arduino.cc](https://www.arduino.cc/en/software)
 cd firmware/
 cp config.example.h config.h
 ```
-Open `config.h` and fill in your WiFi credentials and GitHub info.
+Open `config.h` and set your LED count, pin, and OTA check interval. No WiFi credentials needed — WiFi is configured via WPS on first boot.
 
 ### 5. Select board settings
 - **Tools → Board → ESP32 Arduino → ESP32C3 Dev Module**
@@ -56,16 +56,13 @@ After the first upload, the device will update itself automatically from GitHub 
 
 Edit `firmware/config.h`:
 
-| Setting | Description |
-|---|---|
-| `WIFI_SSID` | Your WiFi network name |
-| `WIFI_PASSWORD` | Your WiFi password |
-| `GITHUB_USER` | Your GitHub username |
-| `GITHUB_REPO` | This repository name |
-| `LED_PIN` | GPIO pin connected to LED data line |
-| `NUM_LEDS` | Number of LEDs in your strip |
-| `LED_BRIGHTNESS` | Brightness 0-255 (keep ≤150 on USB power) |
-| `COLOR_ORDER` | Try `RGB` if colors look wrong |
+| Setting | Default | Description |
+|---|---|---|
+| `OTA_CHECK_INTERVAL_MS` | `60 * 1000` | How often to check for updates (ms) |
+| `LED_PIN` | `8` | GPIO pin connected to LED data line |
+| `NUM_LEDS` | `45` | Number of LEDs in your strip |
+| `LED_BRIGHTNESS` | `80` | Brightness 0-255 (keep ≤150 on USB power) |
+| `COLOR_ORDER` | `GRB` | Try `RGB` if colors look wrong |
 
 ## Releasing a new version
 
@@ -74,12 +71,16 @@ git tag v1.0.1
 git push origin v1.0.1
 ```
 
-GitHub Actions automatically builds the firmware and creates a release. Any running ESP32 will download and install it within the hour.
+GitHub Actions automatically builds the firmware and creates a release. Any running ESP32 will download and install it within one `OTA_CHECK_INTERVAL_MS` cycle.
 
 ## How OTA works
 
-1. ESP32 connects to WiFi on boot
-2. Checks GitHub releases API for a newer version
+1. ESP32 connects to WiFi on boot (WPS on first boot, saved credentials after)
+2. A background task checks GitHub releases API for a newer version
 3. If found, downloads the `.bin` file and flashes itself
 4. Reboots into the new firmware
-5. Repeats the check every hour
+5. Repeats in the background without interrupting the LED animation
+
+## WiFi Setup (first boot)
+
+No WiFi credentials are needed in the code. On first boot the LEDs blink **purple** — press the WPS button on your router within 2 minutes. The ESP32 connects and saves the credentials permanently. WPS is never needed again.

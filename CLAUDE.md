@@ -37,9 +37,9 @@ All firmware lives in a single file: `firmware/firmware.ino`. There are three lo
 
 **LED** — `led_clear()`, `led_set_color()`, `led_rainbow()`. FastLED drives a WS2812B strip. All LED functions call `FastLED.show()` immediately — there is no deferred render.
 
-**WiFi** — `wifi_connect()` reads credentials from NVS (ESP32 Preferences) on every boot. On the very first boot, credentials are read from `config.h` and written to NVS. This means OTA-downloaded binaries (built by CI with empty config.h) can still connect to WiFi using credentials stored from the original user-built flash.
+**WiFi** — `wifi_connect()` checks NVS (ESP32 Preferences) for saved credentials. If empty (first boot), `wifi_wps()` is called: LEDs blink purple and the device waits up to 2 minutes for a WPS button press. On success, credentials are saved to NVS via `WiFi.SSID()` / `WiFi.psk()`. All subsequent boots read from NVS — no credentials in code or config.
 
-**OTA** — `ota_check()` hits the GitHub Releases API (`api.github.com/repos/araltiparmak/esp32c3-led-controller/releases/latest`), compares `tag_name` against `FIRMWARE_VERSION`, downloads the `.bin` asset, and flashes via the ESP32 `Update` library. Called once on boot and then every `OTA_CHECK_INTERVAL_MS`. LED colors signal state: cyan = checking, blue = downloading, green flash = success, red = error.
+**OTA** — `ota_task()` runs as a FreeRTOS task (8KB stack, priority 1) so it never blocks the LED animation in `loop()`. It waits 5s after boot, then calls `ota_check()` every `OTA_CHECK_INTERVAL_MS`. `ota_check()` hits `api.github.com/repos/araltiparmak/esp32c3-led-controller/releases/latest`, compares `tag_name` against `FIRMWARE_VERSION`, finds the `.bin` asset URL, downloads and flashes via the ESP32 `Update` library. LED colors signal state: cyan = checking, blue = downloading, green flash = success, red = error.
 
 ## Releasing
 
@@ -52,7 +52,7 @@ GitHub Actions (`.github/workflows/release.yml`) builds the firmware and attache
 
 ## Config
 
-`firmware/config.h` is gitignored. Users create it by copying `firmware/config.example.h`. It defines WiFi credentials, `OTA_CHECK_INTERVAL_MS`, and LED hardware settings (`LED_PIN`, `NUM_LEDS`, etc.).
+`firmware/config.h` is gitignored. Users create it by copying `firmware/config.example.h`. It defines `OTA_CHECK_INTERVAL_MS` and LED hardware settings (`LED_PIN`, `NUM_LEDS`, etc.). No WiFi credentials — those are handled by WPS and stored in NVS.
 
 `FIRMWARE_VERSION` is injected at compile time via `-DFIRMWARE_VERSION` build flag. It defaults to `"dev"` if not set.
 
