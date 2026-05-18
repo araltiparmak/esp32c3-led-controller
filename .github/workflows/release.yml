@@ -23,6 +23,7 @@ jobs:
 
       - name: Install arduino-cli
         run: |
+          mkdir -p ~/bin
           if [ ! -f ~/bin/arduino-cli ]; then
             curl -fsSL https://raw.githubusercontent.com/arduino/arduino-cli/master/install.sh | BINDIR=~/bin sh
           fi
