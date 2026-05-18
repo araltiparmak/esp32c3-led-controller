@@ -196,7 +196,12 @@ void wifi_connect() {
   if (WiFi.status() == WL_CONNECTED) {
     Serial.printf("\nConnected! IP: %s\n", WiFi.localIP().toString().c_str());
   } else {
-    Serial.println("\nWiFi failed, skipping OTA check");
+    Serial.println("\nWiFi credentials failed, clearing and starting WPS...");
+    Preferences prefs;
+    prefs.begin("wifi", false);
+    prefs.clear();
+    prefs.end();
+    wifi_wps();
   }
   led_clear();
 }
@@ -214,8 +219,10 @@ static String extract_json_string(const String& json, const String& key) {
   return json.substring(idx, end);
 }
 
+String ota_result = "";
+
 void ota_check() {
-  if (WiFi.status() != WL_CONNECTED) return;
+  if (WiFi.status() != WL_CONNECTED) { ota_result = "No WiFi"; return; }
 
   Serial.printf("Checking for updates (current: %s)...\n", FIRMWARE_VERSION);
 
@@ -234,6 +241,7 @@ void ota_check() {
     Serial.printf("GitHub API error: %d\n", code);
     http.end();
     led_clear();
+    ota_result = "GitHub API error: " + String(code);
     return;
   }
 
@@ -248,6 +256,7 @@ void ota_check() {
   if (tag.isEmpty() || tag == FIRMWARE_VERSION) {
     Serial.println("Already up to date");
     led_clear();
+    ota_result = "Already up to date (v" + String(FIRMWARE_VERSION) + ")";
     return;
   }
 
@@ -272,10 +281,12 @@ void ota_check() {
   if (bin_url.isEmpty()) {
     Serial.println("No .bin file found in release");
     led_clear();
+    ota_result = "No .bin found in release";
     return;
   }
 
   Serial.printf("Downloading %s\n", bin_url.c_str());
+  ota_result = "Updating to v" + tag + "... Device will restart.";
 
   // Blue while downloading
   led_set_color(0, 0, 255);
@@ -380,8 +391,9 @@ void web_setup() {
   });
 
   server.on("/update", []() {
-    server.send(200, "text/plain", "Checking for update...");
+    ota_result = "";
     ota_check();
+    server.send(200, "text/plain", ota_result);
   });
 
   server.begin();
